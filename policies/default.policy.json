@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "baseCurrency": "USD",
+  "fx": { "MXN": 0.055 },
+  "overBudgetAction": "DENY",
+  "allowSelfApproval": false,
+  "requireJustificationAbove": 50,
+  "priceTolerancePct": 10,
+  "reconciliationTolerancePct": 1,
+  "maxQuantityPerLine": 20,
+  "merchants": {
+    "allow": [],
+    "block": ["liquiddeath.com", "giftcards-demo.com"]
+  },
+  "blockedKeywords": ["gift card", "tarjeta de regalo", "gambling", "casino", "adult"],
+  "departments": {
+    "eng": {
+      "name": "Ingeniería",
+      "monthlyBudget": 5000,
+      "autoApproveUnder": 150,
+      "hardCapPerPurchase": 2000,
+      "approvers": ["cto@acme.test"]
+    },
+    "marketing": {
+      "name": "Marketing",
+      "monthlyBudget": 1500,
+      "autoApproveUnder": 100,
+      "hardCapPerPurchase": 800,
+      "approvers": ["cmo@acme.test"]
+    },
+    "ops": {
+      "name": "Operaciones",
+      "monthlyBudget": 800,
+      "autoApproveUnder": 75,
+      "hardCapPerPurchase": 500,
+      "approvers": ["coo@acme.test"]
+    }
+  }
+}
