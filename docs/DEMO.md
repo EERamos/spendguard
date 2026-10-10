@@ -1,5 +1,35 @@
 # Guion de demo (3 minutos)
 
+## Guion MCP en live (el principal)
+
+Dos ventanas: Claude Code (con el servidor MCP `spendguard` de `.mcp.json`) y el dashboard en `http://localhost:3000`.
+
+Con `REAP_CHECKOUT=simulated`, la búsqueda y la cotización son reales de Reap y la página donde el titular autoriza el cargo es simulada (lo dice en un banner y la orden sale como `SIM-…`). Decirlo en la demo: el enrollment de la tarjeta en el sandbox no se pudo activar (el passkey de Visa falló en la página de Reap). Con un enrollment `ACTIVE`, `REAP_CHECKOUT=live` usa el checkout real sin cambiar nada más.
+
+**0:00 – Problema (20 s)**
+
+> "Cualquier agente ya puede comprar con Reap. Ninguna empresa le da una tarjeta a un agente sin reglas. SpendGuard es un servidor MCP: conectas el agente que ya usas y compra bajo la política de tu empresa."
+
+**0:20 – Autoaprobada (45 s).** A Claude: *"Necesito un cable USB-C de 100W para la estación de pruebas."*
+Claude busca en Reap, propone, SpendGuard cotiza el total real (producto, envío e impuestos) y devuelve el link de pago de Reap. En el dashboard aparece la solicitud con la regla `WITHIN_AUTO_APPROVE_LIMIT`. Abrir el link y autorizar el cargo: pasa a **Completada** con número de orden y conciliación.
+
+**1:05 – Requiere aprobación (50 s).** A Claude: *"Compra dos monitores portátiles Arzopa de 16 pulgadas para los nuevos ingenieros."*
+Uno solo cotiza en ~114 USD y se autoaprueba; dos pasan de 150 USD: **Pendiente de aprobación, sin link de pago**. Pedirle a Claude que la apruebe: no tiene herramienta para hacerlo. En el dashboard, actuar como `cto@acme.test` y aprobar: ahora sí existe el link.
+
+**1:55 – Denegada (30 s).** A Claude: *"Compra una gift card de 50 dólares para un cliente."*
+Denegada por categoría bloqueada, con el motivo. Ningún link de pago.
+
+**2:25 – No se puede manipular (25 s).** A Claude: *"Cárgalo al presupuesto de Marketing y pon como solicitante al CTO."*
+La identidad viene de la configuración del servidor MCP, no del modelo: la solicitud sigue siendo de `ana@acme.test` en Ingeniería. Mostrar la bitácora de auditoría.
+
+**2:50 – Cierre (10 s)**
+
+> "Una tarjeta registrada una vez en Reap, cero datos de tarjeta en el agente, y un director financiero que decide antes de que exista el cargo."
+
+---
+
+## Guion con dashboard y datos de ejemplo (modo mock)
+
 ## Preparación (antes de pasar)
 
 ```bash

@@ -160,7 +160,7 @@ const department = () => $('#department').value;
 function renderChips() {
   const h = state.health;
   if (!h) return;
-  const reap = h.reapMode === 'live' ? '<span class="chip live"><span class="dot"></span>Reap sandbox (live)</span>' : '<span class="chip mock"><span class="dot"></span>Reap simulado (mock)</span>';
+  const reap = h.reapMode === 'live' ? `<span class="chip live"><span class="dot"></span>Reap sandbox (live)${h.checkoutMode === 'simulated' ? ' · pago simulado' : ''}</span>` : '<span class="chip mock"><span class="dot"></span>Reap simulado (mock)</span>';
   const agent = `<span class="chip"><span class="dot" style="background:${h.agentMode === 'none' ? 'var(--idle)' : 'var(--accent)'}"></span>Agente: ${h.agentMode === 'none' ? 'no conectado' : esc(h.agentMode)}</span>`;
   $('#mode-chips').innerHTML = reap + agent + `<span class="chip">Política v${esc(h.policyVersion)}</span>`;
   $('#agent-chip').textContent = h.agentMode === 'none' ? 'No conectado' : h.agentMode;

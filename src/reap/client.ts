@@ -20,11 +20,17 @@ export interface LiveClientOptions {
   maxRetries?: number;
   timeoutMs?: number;
   sleep?: (ms: number) => Promise<void>;
+  /**
+   * Sandbox only: sent as `X-Simulate-Checkout` on checkout creation so Reap completes the order without buying from
+   * the merchant (sandbox test cards are declined by real stores). Production rejects the header.
+   */
+  simulateCheckout?: 'COMPLETED';
 }
 
 interface RequestOptions {
   body?: unknown;
   idempotencyKey?: string;
+  headers?: Record<string, string>;
   /**
    * What to do on a 5xx. Reap caches 5xx responses per Idempotency-Key, so replaying the same key just replays the error.
    *  - 'retry'         reads and idempotent-by-nature calls: retry as is (default)
@@ -60,6 +66,7 @@ export class LiveReapClient implements ReapClient {
         Authorization: `Bearer ${this.opts.apiKey}`,
         'Reap-Version': this.opts.version,
         Accept: 'application/json',
+        ...o.headers,
       };
       if (o.body !== undefined) headers['Content-Type'] = 'application/json';
       if (key) headers['Idempotency-Key'] = key;
@@ -125,7 +132,12 @@ export class LiveReapClient implements ReapClient {
   }
 
   createCheckout(req: CheckoutRequest, idempotencyKey: string): Promise<Checkout> {
-    return this.request('POST', '/agentic/checkouts', { body: req, idempotencyKey, onServerError: 'fail' });
+    return this.request('POST', '/agentic/checkouts', {
+      body: req,
+      idempotencyKey,
+      onServerError: 'fail',
+      ...(this.opts.simulateCheckout ? { headers: { 'X-Simulate-Checkout': this.opts.simulateCheckout } } : {}),
+    });
   }
 
   getCheckout(id: string): Promise<Checkout> {

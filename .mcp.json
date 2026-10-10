@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "spendguard": {
+      "command": "node",
+      "args": ["--import", "tsx", "src/mcp/server.ts"],
+      "env": {
+        "SPENDGUARD_URL": "http://localhost:3000",
+        "SPENDGUARD_USER_EMAIL": "ana@acme.test",
+        "SPENDGUARD_DEPARTMENT": "eng"
+      }
+    }
+  }
+}

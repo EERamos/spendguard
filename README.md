@@ -50,7 +50,12 @@ npm run smoke        # flujo de punta a punta sobre la API, en memoria
 1. `cp .env.example .env`
 2. En `.env`: `REAP_MODE=live` y `REAP_API_KEY=` con la key del equipo.
 3. Confirmar con Reap si la key es de México (`https://mx.sandbox.api.reap.global`) o de Singapur (`https://sg.sandbox.api.reap.global`) y ajustar `REAP_BASE_URL`.
-4. `npm run dev`
+4. `REAP_CONTACT_EMAIL=` con un correo de dominio real: Reap rechaza dominios reservados como `.test`, que son los de los usuarios demo.
+5. `PUBLIC_BASE_URL=` con una URL **HTTPS**: Reap no acepta `returnUrl` en `http://`.
+6. Registrar la tarjeta de la empresa una vez: `POST /agentic/enrollments` con `source: "EXTERNAL"`, abrir `nextAction.url`, capturar la tarjeta en la página de Reap y poner el `id` en `REAP_ENROLLMENT_ID=` cuando esté `ACTIVE`.
+7. `npm run dev`
+
+**Sin enrollment activo:** `REAP_CHECKOUT=simulated` mantiene la búsqueda y la cotización reales de Reap y simula solo la página donde el titular autoriza el cargo (con un banner que lo dice; las órdenes salen como `SIM-…`). En ese modo `PUBLIC_BASE_URL` puede ser `http://localhost:3000`.
 
 Importante para live:
 
@@ -59,7 +64,7 @@ Importante para live:
 - **El pago se autoriza en la página de Reap con la tarjeta del equipo y el OTP `456789`.** Las compras del sandbox son simuladas: no se envía nada ni se mueve dinero real.
 - **Nunca se suben keys ni datos de tarjeta al repo.** Viven solo en `.env`, que está en `.gitignore`.
 - El módulo agéntico puede responder `403 AGENTIC_PAYMENTS_NOT_ENABLED` hasta que Reap lo habilite para la cuenta.
-- Los endpoints live están implementados según la documentación de Reap (`Reap-Version 2025-02-14`), pero **no se han probado contra el sandbox real** porque las keys se entregan en el evento. Ver "Pendientes por validar en live" en [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+- Probado contra el sandbox real de Reap (Singapur, `Reap-Version 2025-02-14`): búsqueda, detalle, variantes y cotización. El checkout real también se probó directo contra la API: enrollment `ACTIVE`, autorización con passkey en la página de Reap y orden `COMPLETED`. En sandbox hace falta `REAP_SIMULATE_CHECKOUT=COMPLETED` (header `X-Simulate-Checkout`); sin él, la tienda real rechaza la tarjeta de prueba y el checkout termina `FAILED`.
 
 ---
 
@@ -68,6 +73,26 @@ Importante para live:
 SpendGuard **no trae agente**: deja el espacio listo para conectarlo. La guía para construirlo y conectarlo está en **[docs/AGENT_INTEGRATION.md](docs/AGENT_INTEGRATION.md)**: la interfaz `Agent`, las herramientas ya hechas que pasan siempre por la política, un esqueleto con Claude y la API REST para un agente externo.
 
 Mientras no haya agente conectado, `POST /api/agent/chat` responde "agente no conectado".
+
+---
+
+## Servidor MCP: cualquier agente compra bajo la política de la empresa
+
+SpendGuard se expone como servidor MCP. Claude Code, Claude Desktop, Cursor o cualquier cliente MCP obtienen seis herramientas (`search_products`, `get_product_options`, `resolve_variant`, `propose_purchase`, `get_budget`, `get_request_status`) y **ninguna** para aprobar, rechazar o cambiar la política.
+
+```bash
+npm run dev     # SpendGuard (API + dashboard) en http://localhost:3000
+npm run mcp     # servidor MCP por stdio (normalmente lo lanza el cliente MCP)
+```
+
+- **Claude Code:** el repo trae [`.mcp.json`](.mcp.json). Abre Claude Code en esta carpeta y acepta el servidor `spendguard`.
+- **Claude Desktop o Cursor:** copia el bloque `spendguard` de `.mcp.json` a su configuración y cambia `args` a la ruta absoluta de `src/mcp/server.ts` (o usa `cwd`).
+
+Cómo se mantiene seguro:
+
+- **La identidad no la decide el modelo.** A nombre de quién compra y para qué departamento salen de `SPENDGUARD_USER_EMAIL` y `SPENDGUARD_DEPARTMENT`, que fija quien configura el cliente MCP. Lo que el modelo mande en esos campos se ignora (hay prueba).
+- **Un solo proceso decide.** El servidor MCP es un proxy delgado a `POST /api/agent/tool`; el motor de políticas, el candado del presupuesto y el dashboard viven en el servidor de SpendGuard, así que varios agentes a la vez no pueden gastar de más.
+- **El agente nunca ve la tarjeta.** La tarjeta de la empresa se registra una vez en la página de Reap (enrollment) y cada cargo lo autoriza el titular en la página de Reap.
 
 ---
 

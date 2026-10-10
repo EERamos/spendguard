@@ -143,14 +143,17 @@ Reap guarda en caché las respuestas 4xx y 5xx por `Idempotency-Key` durante 24 
 
 ### Pendientes por validar en live
 
-La integración live sigue la documentación de Reap, pero no se ha probado contra el sandbox real. Al recibir las keys, revisar:
+Validado contra el sandbox real (Singapur, 9 de octubre de 2026): búsqueda, detalle, variantes y cotización. Lo aprendido:
 
-- **Región de la key:** México (`mx.sandbox…`) o Singapur (`sg.sandbox…`).
-- **`owner` del checkout:** la documentación muestra `owner.reference` en un lugar y `owner.id` en otro. SpendGuard manda `{ type: 'CLIENT_REFERENCE', reference, email }`. Si Reap lo rechaza, el cambio es una línea en `openCheckout` de `purchase-service.ts`.
-- **Habilitación:** el módulo puede regresar `403 AGENTIC_PAYMENTS_NOT_ENABLED` hasta que Reap lo active.
-- **Forma exacta de las respuestas:** `shippingOptions`, `amountBreakdown`, `nextAction` y `finalAmount`; ajustar los tipos en `src/reap/types.ts` si algo difiere.
-- **Dirección de envío:** cada tienda debe enviar a la dirección de las variables `SHIP_*`.
-- **Enrollment:** hoy no se manda `enrollmentId`, así que el titular captura la tarjeta en la página de Reap. Con una tarjeta ya registrada se puede pasar su `enrollmentId`.
+- **Correo de la cotización:** Reap rechaza dominios reservados (`.test`, `.example`) con un error que culpa a `shippingAddress`. `REAP_CONTACT_EMAIL` sustituye el correo del solicitante.
+- **Checkout:** el cuerpo es `{ quoteId, enrollmentId, presentation }`, sin `owner`, y `returnUrl` debe ser HTTPS. Con eso Reap responde `409 ENROLLMENT_NOT_ACTIVE` en lugar de un error de validación.
+- **Enrollment:** se crea con `POST /agentic/enrollments` (`source: "EXTERNAL"`) y el titular captura la tarjeta en la página de Reap, que exige crear un passkey de Visa. Ni el header de sandbox `X-Simulate-Checkout` funciona sin un enrollment `ACTIVE`.
+- **Merchant:** en live llega como nombre ("Baseus US"), no como dominio; el bloqueo por dominio hay que revisarlo contra esos nombres.
+
+- **Passkey:** un passkey de `sandbox.auth.visa.com` que quedó de un intento fallido bloquea los siguientes enrollments. Se borra en el dispositivo (Windows: Configuración > Cuentas > Claves de acceso) y se reintenta con otra tarjeta de prueba.
+- **Sandbox:** el checkout necesita el header `X-Simulate-Checkout: COMPLETED` (`REAP_SIMULATE_CHECKOUT=COMPLETED`). Sin él la autorización pasa, pero la tienda real rechaza la tarjeta de prueba y el checkout termina `FAILED`. Con él: `COMPLETED` con `orderId` y `finalAmount`.
+
+El cargo real se probó directo contra la API de Reap. Como respaldo, `REAP_CHECKOUT=simulated` (`src/reap/hybrid.ts`) mantiene búsqueda y cotización reales y simula solo la página de autorización, con un banner que lo dice.
 
 ---
 

@@ -42,6 +42,13 @@ export interface PurchaseServiceDeps {
   publicBaseUrl: string;
   /** Used when a request does not carry its own shipping address. */
   defaultShipping: ShippingAddress;
+  /**
+   * Email sent to Reap instead of the requester's. Reap rejects reserved TLDs (.test, .example),
+   * so demo identities such as ana@acme.test need a deliverable-looking contact address.
+   */
+  contactEmail?: string;
+  /** Reap enrollment (the company card stored once on Reap's hosted page) charged by every checkout. */
+  enrollmentId?: string;
   /** Epoch ms. Injectable for tests. */
   now?: () => number;
 }
@@ -151,6 +158,8 @@ export class PurchaseService {
   private readonly policy: PolicyProvider;
   private readonly publicBaseUrl: string;
   private readonly defaultShipping: ShippingAddress;
+  private readonly contactEmail: string | undefined;
+  private readonly enrollmentId: string | undefined;
   private readonly now: () => number;
 
   constructor(deps: PurchaseServiceDeps) {
@@ -159,6 +168,8 @@ export class PurchaseService {
     this.policy = deps.policy;
     this.publicBaseUrl = deps.publicBaseUrl.replace(/\/$/, '');
     this.defaultShipping = deps.defaultShipping;
+    this.contactEmail = deps.contactEmail;
+    this.enrollmentId = deps.enrollmentId;
     this.now = deps.now ?? Date.now;
   }
 
@@ -263,7 +274,7 @@ export class PurchaseService {
     const shipping = variant.requiresShipping === false ? undefined : (input.shippingAddress ?? this.defaultShipping);
     let quote = await this.reap.createQuote(
       {
-        email: input.requester.email,
+        email: this.contactEmail ?? input.requester.email,
         items: [{ variantId: variant.id, quantity: input.quantity }],
         ...(shipping ? { shippingAddress: shipping } : {}),
         ...(input.offerCode ? { offerCode: input.offerCode } : {}),
@@ -636,7 +647,7 @@ export class PurchaseService {
     const failures = this.store.listAudit(req.id).filter((e) => e.type === 'QUOTE_FAILED').length;
     let q = await this.reap.createQuote(
       {
-        email: req.requester.email,
+        email: this.contactEmail ?? req.requester.email,
         items: [{ variantId: req.item.variantId, quantity: req.item.quantity }],
         ...(req.shippingAddress ? { shippingAddress: req.shippingAddress } : {}),
         ...(req.offerCode ? { offerCode: req.offerCode } : {}),
@@ -656,7 +667,7 @@ export class PurchaseService {
     return this.reap.createCheckout(
       {
         quoteId: r.quote.id,
-        owner: { type: 'CLIENT_REFERENCE', reference: r.requester.id, email: r.requester.email },
+        ...(this.enrollmentId ? { enrollmentId: this.enrollmentId } : {}),
         presentation: { type: 'REDIRECT', returnUrl: `${this.publicBaseUrl}/return/${r.id}` },
       },
       // Deterministic: retrying the same request+quote can never open a second checkout.

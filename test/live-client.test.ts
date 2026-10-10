@@ -55,7 +55,7 @@ const QUOTE = {
 };
 const CHECKOUT_REQ: CheckoutRequest = {
   quoteId: 'quo_1',
-  owner: { type: 'CLIENT_REFERENCE', reference: 'u1' },
+  enrollmentId: 'enr_1',
   presentation: { type: 'REDIRECT', returnUrl: 'http://localhost:3000/return/req_1' },
 };
 const SERVER_ERROR = { status: 500, body: { error: { code: 'INTERNAL', message: 'boom' } } };
@@ -78,6 +78,28 @@ describe('LiveReapClient', () => {
         Accept: 'application/json',
       },
     });
+  });
+
+  it('sends X-Simulate-Checkout on checkout creation only, and only when configured', async () => {
+    const f = fakeFetch([
+      { status: 200, body: { id: 'chk_1', status: 'REQUIRES_ACTION' } },
+      { status: 200, body: QUOTE },
+    ]);
+    const sandbox = new LiveReapClient({
+      baseUrl: 'https://api.reap.test/',
+      apiKey: 'sk_test_123',
+      version: '2025-02-14',
+      fetchImpl: f.impl,
+      simulateCheckout: 'COMPLETED',
+    });
+    await sandbox.createCheckout(CHECKOUT_REQ, 'checkout:req_1:quo_1');
+    await sandbox.createQuote(QUOTE_REQ, 'quote:req_1:1');
+    expect(f.calls[0]!.headers['X-Simulate-Checkout']).toBe('COMPLETED');
+    expect(f.calls[1]!.headers['X-Simulate-Checkout']).toBeUndefined();
+
+    const plain = makeClient([{ status: 200, body: { id: 'chk_1', status: 'REQUIRES_ACTION' } }]);
+    await plain.client.createCheckout(CHECKOUT_REQ, 'checkout:req_1:quo_1');
+    expect(plain.calls[0]!.headers['X-Simulate-Checkout']).toBeUndefined();
   });
 
   it('omits Idempotency-Key and Content-Type on plain reads, and encodes ids', async () => {

@@ -3,13 +3,14 @@ import Fastify, { LogController } from 'fastify';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z, ZodError } from 'zod';
 import { createAgent } from './agent';
+import { AgentToolbox } from './agent/tools';
 import type { Agent } from './agent/types';
 import { loadConfig } from './config';
 import type { AppConfig } from './config';
 import { loadPolicyFile, PolicyProvider } from './domain/policy';
 import type { Policy } from './domain/policy';
 import type { RequestStatus } from './domain/types';
-import { createReapClient, MockReapClient } from './reap';
+import { createReapClient, HybridReapClient, MockReapClient } from './reap';
 import { ReapApiError } from './reap/errors';
 import type { ReapClient } from './reap/types';
 import { PurchaseService } from './services/purchase-service';
@@ -95,6 +96,15 @@ const ChatBody = z.object({
   shippingAddress: ShippingAddressSchema.optional(),
 });
 
+const ToolCallBody = z.object({
+  name: z.string().min(1),
+  input: z.unknown().optional(),
+  requesterEmail: Email,
+  requesterId: z.string().min(1).optional(),
+  departmentId: z.string().min(1),
+  shippingAddress: ShippingAddressSchema.optional(),
+});
+
 const ListQuery = z.object({
   status: z
     .string()
@@ -166,6 +176,8 @@ export async function buildApp(overrides: AppOverrides = {}): Promise<BuiltApp> 
     policy,
     publicBaseUrl: config.publicBaseUrl,
     defaultShipping: config.defaultShipping,
+    ...(config.reapContactEmail ? { contactEmail: config.reapContactEmail } : {}),
+    ...(config.reapEnrollmentId ? { enrollmentId: config.reapEnrollmentId } : {}),
     ...(overrides.now ? { now: overrides.now } : {}),
   });
 
@@ -222,6 +234,7 @@ export async function buildApp(overrides: AppOverrides = {}): Promise<BuiltApp> 
   app.get('/api/health', async () => ({
     ok: true,
     reapMode: reap instanceof MockReapClient ? 'mock' : 'live',
+    checkoutMode: reap instanceof MockReapClient || reap instanceof HybridReapClient ? 'simulated' : 'live',
     agentMode: agent.mode,
     policyVersion: policy.get().version,
   }));
@@ -323,6 +336,18 @@ export async function buildApp(overrides: AppOverrides = {}): Promise<BuiltApp> 
     return { ...result, requests };
   });
 
+  // One policy-safe tool call for an external agent (the MCP server in src/mcp/ proxies here).
+  // Who the agent acts for comes from the caller's configuration, never from the model's tool input.
+  app.post('/api/agent/tool', async (req) => {
+    const b = ToolCallBody.parse(req.body ?? {});
+    const toolbox = new AgentToolbox(service, {
+      requester: { id: b.requesterId ?? b.requesterEmail, email: b.requesterEmail },
+      departmentId: b.departmentId,
+      ...(b.shippingAddress ? { shippingAddress: b.shippingAddress } : {}),
+    });
+    return toolbox.execute(b.name, b.input);
+  });
+
   app.get('/api/products/search', async (req) => {
     const q = SearchQuery.parse(req.query);
     return service.searchProducts(q.q, {
@@ -350,16 +375,17 @@ export async function buildApp(overrides: AppOverrides = {}): Promise<BuiltApp> 
 
   // ------------------------------------------------------------------ mock Reap hosted page
 
-  if (reap instanceof MockReapClient) {
+  if (reap instanceof MockReapClient || reap instanceof HybridReapClient) {
     const mock = reap;
+    const banner = reap instanceof HybridReapClient ? HYBRID_BANNER : MOCK_BANNER;
 
     app.get('/mock/reap/approve/:checkoutId', async (req, reply) => {
       const { checkoutId } = CheckoutParams.parse(req.params);
       let html: string;
       try {
-        html = mockApprovalPage(mock.describeCheckout(checkoutId));
+        html = mockApprovalPage(mock.describeCheckout(checkoutId), banner);
       } catch (e) {
-        html = mockMessagePage('Checkout no encontrado', e instanceof Error ? e.message : String(e));
+        html = mockMessagePage('Checkout no encontrado', e instanceof Error ? e.message : String(e), '/', banner);
         reply.status(404);
       }
       return reply.type('text/html; charset=utf-8').send(html);
@@ -384,7 +410,7 @@ export async function buildApp(overrides: AppOverrides = {}): Promise<BuiltApp> 
         return reply
           .status(409)
           .type('text/html; charset=utf-8')
-          .send(mockMessagePage('No se pudo procesar el pago', e instanceof Error ? e.message : String(e), back));
+          .send(mockMessagePage('No se pudo procesar el pago', e instanceof Error ? e.message : String(e), back, banner));
       }
     });
   }
@@ -425,13 +451,16 @@ const PAGE_STYLE = `
   details { margin-top:16px; font-size:13px; color:var(--muted); } input { font:inherit; padding:6px 8px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--ink); width:120px; }
 `;
 
-function shell(title: string, body: string): string {
+const MOCK_BANNER = 'Simulación de la página de Reap (modo mock)';
+const HYBRID_BANNER = 'Pago simulado. La búsqueda y la cotización son reales de Reap (sandbox); el cargo no.';
+
+function shell(title: string, body: string, banner: string): string {
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)}</title><style>${PAGE_STYLE}</style></head><body>
-<div class="banner">Simulación de la página de Reap (modo mock)</div><main>${body}</main></body></html>`;
+<div class="banner">${esc(banner)}</div><main>${body}</main></body></html>`;
 }
 
-function mockApprovalPage(c: CheckoutDescription): string {
+function mockApprovalPage(c: CheckoutDescription, banner: string): string {
   const lines = c.lines
     .map(
       (l) =>
@@ -465,13 +494,15 @@ function mockApprovalPage(c: CheckoutDescription): string {
       SpendGuard y el agente nunca ven los datos de la tarjeta.</div>
       ${actions}
     </div>`,
+    banner,
   );
 }
 
-function mockMessagePage(title: string, message: string, back = '/'): string {
+function mockMessagePage(title: string, message: string, back: string, banner: string): string {
   return shell(
     title,
     `<div class="card"><h1>${esc(title)}</h1><p class="muted">${esc(message)}</p>
      <div class="actions"><a class="btn ok" href="${esc(back)}">Volver a SpendGuard</a></div></div>`,
+    banner,
   );
 }

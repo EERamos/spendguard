@@ -12,7 +12,7 @@ async function main(): Promise<void> {
 
   const reapText =
     config.reapMode === 'live'
-      ? `Reap EN VIVO (sandbox) en ${config.reapBaseUrl}, Reap-Version ${config.reapVersion}`
+      ? `Reap EN VIVO (sandbox) en ${config.reapBaseUrl}, Reap-Version ${config.reapVersion}${config.reapCheckout === 'simulated' ? ' (pago simulado)' : ''}`
       : 'Reap SIMULADO (modo mock, sin red ni keys)';
   const agentText = agent.mode === 'none' ? 'no conectado (implementa Agent en src/agent/types.ts)' : `conectado (${agent.mode})`;
   const ship = config.defaultShipping;

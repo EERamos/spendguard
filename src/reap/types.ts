@@ -123,9 +123,9 @@ export interface Quote {
 
 export interface CheckoutRequest {
   quoteId: string;
-  /** Omit to let the user pick or enter a card on the Reap-hosted approval page. */
+  /** The stored card to charge. Required by live Reap (must be ACTIVE); the mock does not need it. */
   enrollmentId?: string;
-  owner: { type: 'CLIENT_REFERENCE'; reference: string; email?: string };
+  /** Live Reap only accepts an HTTPS returnUrl. */
   presentation: { type: 'REDIRECT'; returnUrl: string };
 }
 
