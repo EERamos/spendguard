@@ -3,6 +3,8 @@ import type { ShippingAddress } from './reap/types';
 
 const EnvSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
+  // Loopback only by default: the dashboard approves spend and has no login, so it must not be reachable from the LAN.
+  HOST: z.string().default('localhost'),
   PUBLIC_BASE_URL: z.string().default('http://localhost:3000'),
   REAP_MODE: z.enum(['mock', 'live']).default('mock'),
   REAP_BASE_URL: z.string().default('https://mx.sandbox.api.reap.global'),
@@ -30,6 +32,8 @@ const EnvSchema = z.object({
 
 export interface AppConfig {
   port: number;
+  /** Interface to bind. `localhost` = this machine only; `0.0.0.0` exposes it to the network. */
+  host: string;
   publicBaseUrl: string;
   reapMode: 'mock' | 'live';
   reapBaseUrl: string;
@@ -69,6 +73,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 
   return {
     port: e.PORT,
+    host: e.HOST,
     publicBaseUrl: e.PUBLIC_BASE_URL.replace(/\/$/, ''),
     reapMode: e.REAP_MODE,
     reapBaseUrl: e.REAP_BASE_URL,
