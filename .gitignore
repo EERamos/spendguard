@@ -4,3 +4,4 @@ coverage/
 data/
 .env
 *.log
+.claude/hooks/.last-payload.json
