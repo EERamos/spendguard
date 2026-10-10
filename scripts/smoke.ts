@@ -1,8 +1,8 @@
 /**
- * End-to-end smoke test, fully in-process: mock Reap, in-memory store, rule-based agent, no network.
+ * End-to-end smoke test, fully in-process: mock Reap, in-memory store, no agent connected, no network.
  * Run with `npm run smoke`. Exits 1 on the first failure.
  */
-import { RuleBasedAgent } from '../src/agent/rule-agent';
+import { NOT_CONFIGURED_REPLY } from '../src/agent';
 import { buildApp } from '../src/app';
 import type { PurchaseRequest } from '../src/domain/types';
 
@@ -21,8 +21,7 @@ function check(cond: unknown, label: string, detail?: unknown): void {
 
 async function main(): Promise<void> {
   const { app } = await buildApp({
-    config: { dataFile: null, logger: false, reapMode: 'mock', anthropicApiKey: undefined },
-    agent: (service) => new RuleBasedAgent(service),
+    config: { dataFile: null, logger: false, reapMode: 'mock' },
   });
 
   const json = async (method: 'GET' | 'POST' | 'PUT', url: string, body?: unknown) => {
@@ -40,7 +39,7 @@ async function main(): Promise<void> {
 
   // 1. Health
   const health = await json('GET', '/api/health');
-  check(health.status === 200 && health.body.ok === true && health.body.reapMode === 'mock' && health.body.agentMode === 'rules', 'health: ok, Reap mock, agente de reglas', health.body);
+  check(health.status === 200 && health.body.ok === true && health.body.reapMode === 'mock' && health.body.agentMode === 'none', 'health: ok, Reap mock, agente no conectado', health.body);
 
   // 2. Auto-approve: cheap switches -> checkout opened, payment link exists
   const auto = await propose({ productId: 'p_switches', quantity: 2 });
@@ -101,34 +100,25 @@ async function main(): Promise<void> {
   const missing = await json('GET', '/api/requests/req_nope');
   check(missing.status === 404 && missing.body.error.code === 'REQUEST_NOT_FOUND', 'solicitud inexistente -> 404', missing.body);
 
-  // 8. Agent chat
+  // 8. Agent slot: no agent connected yet, the endpoint answers with the placeholder
   const chat = await json('POST', '/api/agent/chat', {
     message: 'compra 2 power banks de menos de 100 dólares',
     requesterEmail: 'ana@acme.test',
     departmentId: 'eng',
   });
   check(
-    chat.status === 200 && typeof chat.body.reply === 'string' && chat.body.requestIds.length === 1 && Array.isArray(chat.body.history),
-    'agente: responde y crea 1 solicitud',
+    chat.status === 200 && chat.body.mode === 'none' && chat.body.reply === NOT_CONFIGURED_REPLY && chat.body.requestIds.length === 0,
+    'agente: /api/agent/chat responde el placeholder (mode none)',
     chat.body,
   );
-  const agentReq = chat.body.requests[0] as PurchaseRequest;
-  check(agentReq.item.productId === 'p_powerbank' && agentReq.item.quantity === 2, `agente: eligió ${agentReq.item.productName} x${agentReq.item.quantity} (${agentReq.status})`, agentReq.item);
-  console.log(`   respuesta del agente: ${String(chat.body.reply).split('\n').join(' | ')}`);
-
-  const blockedChat = await json('POST', '/api/agent/chat', {
-    message: 'compra una gift card de $100',
-    requesterEmail: 'ana@acme.test',
-    departmentId: 'marketing',
-    history: chat.body.history,
-  });
-  check(blockedChat.status === 200 && blockedChat.body.requestIds.length === 0 && /pol[ií]tica/i.test(blockedChat.body.reply), 'agente: gift card excluida por política', blockedChat.body.reply);
+  const badChat = await json('POST', '/api/agent/chat', { message: '', requesterEmail: 'ana@acme.test', departmentId: 'eng' });
+  check(badChat.status === 400 && badChat.body.error.code === 'VALIDATION_ERROR', 'agente: mensaje vacío -> 400', badChat.body);
 
   // 9. Budgets reflect spend
   const budgets = await json('GET', '/api/budgets');
   const eng = (budgets.body.budgets as any[]).find((b) => b.departmentId === 'eng');
   check(Math.abs(eng.committed - doneReq.checkout!.finalAmount!.amount) < 0.001, `presupuesto eng: comprometido ${eng.committed} USD`, eng);
-  const expectedReserved = [approved.body.request, own.body.request, agentReq].reduce((s, r: PurchaseRequest) => s + r.quote.total.amount, 0);
+  const expectedReserved = [approved.body.request, own.body.request].reduce((s, r: PurchaseRequest) => s + r.quote.total.amount, 0);
   check(Math.abs(eng.reserved - expectedReserved) < 0.01, `presupuesto eng: reservado ${eng.reserved} USD, disponible ${eng.remaining}`, eng);
 
   // 10. Policy update and audit trail

@@ -40,14 +40,8 @@ const FILTERS = [
   ['done', 'Completadas', ['COMPLETED']],
   ['closed', 'Denegadas / otras', ['DENIED', 'REJECTED', 'FAILED', 'EXPIRED', 'CANCELLED']],
 ];
-const SUGGESTIONS = [
-  'Compra 2 power banks de menos de 100 dólares para el equipo de soporte',
-  'Necesito un monitor portátil para trabajo remoto',
-  'Compra 3 sets de switches para teclado mecánico',
-  'Compra una maceta para la oficina',
-  'Compra una gift card de $100',
-  '¿Cuánto presupuesto me queda?',
-];
+// Shown only while the conversation is empty and an agent is connected.
+const SUGGESTIONS = ['Compra 2 power banks de menos de 100 dólares para el equipo de soporte'];
 const DEFAULT_USERS = ['ana@acme.test', 'luis@acme.test', 'sofia@acme.test'];
 
 const state = {
@@ -167,9 +161,13 @@ function renderChips() {
   const h = state.health;
   if (!h) return;
   const reap = h.reapMode === 'live' ? '<span class="chip live"><span class="dot"></span>Reap sandbox (live)</span>' : '<span class="chip mock"><span class="dot"></span>Reap simulado (mock)</span>';
-  const agent = `<span class="chip"><span class="dot" style="background:var(--accent)"></span>Agente: ${h.agentMode === 'claude' ? 'Claude' : 'reglas'}</span>`;
+  const agent = `<span class="chip"><span class="dot" style="background:${h.agentMode === 'none' ? 'var(--idle)' : 'var(--accent)'}"></span>Agente: ${h.agentMode === 'none' ? 'no conectado' : esc(h.agentMode)}</span>`;
   $('#mode-chips').innerHTML = reap + agent + `<span class="chip">Política v${esc(h.policyVersion)}</span>`;
-  $('#agent-chip').textContent = h.agentMode === 'claude' ? 'Claude' : 'Modo reglas';
+  $('#agent-chip').textContent = h.agentMode === 'none' ? 'No conectado' : h.agentMode;
+  if (state.renderedAgentMode !== h.agentMode) {
+    state.renderedAgentMode = h.agentMode;
+    renderChat();
+  }
 }
 
 function renderSessionOptions() {
@@ -525,7 +523,11 @@ function renderChat() {
   const log = $('#chat-log');
   const msgs = state.chat.messages;
   if (msgs.length === 0 && !state.chatBusy) {
-    log.innerHTML = `<div class="msg agent"><div class="who">Agente</div>Hola. Dime qué necesitas comprar y lo gestiono con la política de la empresa.
+    log.innerHTML =
+      state.health?.agentMode === 'none'
+        ? `<div class="msg agent"><div class="who">Agente</div>El agente de compras todavía no está conectado. Mientras tanto, las solicitudes llegan por
+      <span class="mono">POST /api/requests</span>; cuando tu agente implemente la interfaz <span class="mono">Agent</span> (src/agent/types.ts), conversará aquí con la misma política.</div>`
+        : `<div class="msg agent"><div class="who">Agente</div>Hola. Dime qué necesitas comprar y lo gestiono con la política de la empresa.
       Nunca pago ni veo tarjetas: si la compra procede, te doy el link de pago de Reap.</div>`;
   } else {
     log.innerHTML =
@@ -537,14 +539,14 @@ function renderChat() {
               (r) => `<a class="mini" href="#/requests/${esc(r.id)}"><span>${esc(r.item.productName)}${r.item.quantity > 1 ? ` ×${r.item.quantity}` : ''} · <span class="num">${fmtMoney(r.quote.total)}</span></span>${badge(r.status)}</a>`,
             )
             .join('');
-          return `<div class="msg agent"><div class="who">Agente${m.mode === 'claude' ? ' · Claude' : ''}</div>${richText(m.text)}${minis ? `<div class="req-mini">${minis}</div>` : ''}</div>`;
+          return `<div class="msg agent"><div class="who">Agente${m.mode && m.mode !== 'none' ? ` · ${esc(m.mode)}` : ''}</div>${richText(m.text)}${minis ? `<div class="req-mini">${minis}</div>` : ''}</div>`;
         })
         .join('') + (state.chatBusy ? '<div class="msg agent pending">Pensando y consultando la política…</div>' : '');
   }
   log.scrollTop = log.scrollHeight;
   $('#chat-send').disabled = state.chatBusy;
   $('#suggestions').innerHTML =
-    msgs.length === 0 ? SUGGESTIONS.map((s) => `<button class="suggestion" type="button" data-suggest="${esc(s)}">${esc(s)}</button>`).join('') : '';
+    msgs.length === 0 && state.health && state.health.agentMode !== 'none' ? SUGGESTIONS.map((s) => `<button class="suggestion" type="button" data-suggest="${esc(s)}">${esc(s)}</button>`).join('') : '';
 }
 
 async function sendChat(text) {

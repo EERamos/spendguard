@@ -8,8 +8,6 @@ const EnvSchema = z.object({
   REAP_BASE_URL: z.string().default('https://mx.sandbox.api.reap.global'),
   REAP_API_KEY: z.string().optional(),
   REAP_VERSION: z.string().default('2025-02-14'),
-  ANTHROPIC_API_KEY: z.string().optional(),
-  AGENT_MODEL: z.string().default('claude-sonnet-5-5'),
   DATA_FILE: z.string().default('data/store.json'),
   POLICY_FILE: z.string().default('policies/default.policy.json'),
   POLL_INTERVAL_MS: z.coerce.number().int().positive().default(5000),
@@ -33,8 +31,6 @@ export interface AppConfig {
   reapBaseUrl: string;
   reapApiKey?: string;
   reapVersion: string;
-  anthropicApiKey?: string;
-  agentModel: string;
   /** null = keep everything in memory (tests). */
   dataFile: string | null;
   policyFile: string;
@@ -66,8 +62,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     reapBaseUrl: e.REAP_BASE_URL,
     reapApiKey: e.REAP_API_KEY,
     reapVersion: e.REAP_VERSION,
-    anthropicApiKey: e.ANTHROPIC_API_KEY,
-    agentModel: e.AGENT_MODEL,
     dataFile: e.DATA_FILE,
     policyFile: e.POLICY_FILE,
     pollIntervalMs: e.POLL_INTERVAL_MS,

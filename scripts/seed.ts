@@ -162,15 +162,6 @@ async function main(): Promise<void> {
   });
   line(optiplex, 'excede el tope por compra');
 
-  console.log('\nAgente');
-  const chat = await call<{ reply: string; requests: Req[]; mode: string }>('POST', '/api/agent/chat', {
-    message: 'Compra 2 power banks de menos de 100 dólares para el equipo de soporte',
-    requesterEmail: 'ana@acme.test',
-    departmentId: 'eng',
-  });
-  for (const r of chat.requests) line(r, `vía agente (${chat.mode})`);
-  console.log(`  "${chat.reply.split('\n')[0]}"`);
-
   const { budgets } = await call<{ budgets: { name: string; committed: number; reserved: number; remaining: number; currency: string }[] }>('GET', '/api/budgets');
   console.log('\nPresupuestos');
   for (const b of budgets) {

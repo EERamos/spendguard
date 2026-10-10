@@ -14,7 +14,7 @@ async function main(): Promise<void> {
     config.reapMode === 'live'
       ? `Reap EN VIVO (sandbox) en ${config.reapBaseUrl}, Reap-Version ${config.reapVersion}`
       : 'Reap SIMULADO (modo mock, sin red ni keys)';
-  const agentText = agent.mode === 'claude' ? `Claude (${config.agentModel})` : 'agente de reglas (sin ANTHROPIC_API_KEY)';
+  const agentText = agent.mode === 'none' ? 'no conectado (implementa Agent en src/agent/types.ts)' : `conectado (${agent.mode})`;
   const ship = config.defaultShipping;
   app.log.info(
     [
