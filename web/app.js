@@ -295,18 +295,27 @@ function quoteTable(q) {
     <div class="muted small" style="margin-top:6px">Cotización <span class="mono">${esc(q.id)}</span> (intento ${esc(q.attempt)})${ship ? ` · ${esc(ship.name)}` : ''} · expira ${fmtTime(q.expiresAt)}</div>`;
 }
 
+function approvalHint(r) {
+  const approvers = state.policy?.departments?.[r.departmentId]?.approvers ?? [];
+  const me = actor();
+  const canApprove = approvers.length === 0 || approvers.map((a) => a.toLowerCase()).includes(me);
+  const self = me === r.requester.email.toLowerCase();
+  let hint = `Aprueba: <strong>${esc(approvers.join(', ') || 'cualquiera')}</strong>. Estás actuando como <strong>${esc(me || '–')}</strong>.`;
+  if (!canApprove) hint += ' No eres aprobador de este departamento: cambia "Actuando como" para aprobar.';
+  else if (self && !state.policy?.allowSelfApproval) hint += ' No puedes aprobar tu propia solicitud.';
+  return hint;
+}
+
+/** Updates only the hint, so the buttons are not rebuilt while the user is clicking them. */
+function updateApprovalHint() {
+  const el = $('#approval-hint');
+  if (el && state.selected) el.innerHTML = approvalHint(state.selected.request);
+}
+
 function actionsSection(r) {
-  const dept = state.policy?.departments?.[r.departmentId];
-  const approvers = dept?.approvers ?? [];
   if (r.status === 'PENDING_APPROVAL') {
-    const me = actor();
-    const canApprove = approvers.length === 0 || approvers.map((a) => a.toLowerCase()).includes(me);
-    const self = me === r.requester.email.toLowerCase();
-    let hint = `Aprueba: <strong>${esc(approvers.join(', ') || 'cualquiera')}</strong>. Estás actuando como <strong>${esc(me || '–')}</strong>.`;
-    if (!canApprove) hint += ' No eres aprobador de este departamento: cambia "Actuando como" para aprobar.';
-    else if (self && !state.policy?.allowSelfApproval) hint += ' No puedes aprobar tu propia solicitud.';
     return `<div class="section"><h3>Aprobación interna</h3>
-      <div class="callout warn">${hint}</div>
+      <div class="callout warn" id="approval-hint">${approvalHint(r)}</div>
       <div class="stack" style="margin-top:10px">
         <textarea class="note" id="action-note" placeholder="Nota para aprobar o motivo del rechazo"></textarea>
         <div class="btn-row">
@@ -411,7 +420,7 @@ function renderDetail(force = false) {
     return;
   }
   const { request: r, audit } = state.selected;
-  const sig = `${r.id}|${r.updatedAt}|${audit.length}|${actor()}|${state.policy?.version}`;
+  const sig = `${r.id}|${r.updatedAt}|${audit.length}|${state.policy?.version}`;
   if (!force && sig === state.detailSig) return;
   // Keep what the approver is typing across polls.
   const note = $('#action-note')?.value ?? '';
@@ -471,7 +480,7 @@ function select(id) {
   state.listSig = '';
   renderRequests();
   loadSelected().catch((e) => toast(e.message, 'bad'));
-  if (id && window.matchMedia('(max-width: 1420px)').matches) {
+  if (id && window.matchMedia('(max-width: 940px)').matches) {
     $('#detail').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 }
@@ -692,9 +701,12 @@ function wire() {
   actorEl.addEventListener('change', () => {
     store.set('sg.actor', actor());
     renderChatContext();
-    renderDetail(true);
+    updateApprovalHint();
   });
-  actorEl.addEventListener('input', () => renderChatContext());
+  actorEl.addEventListener('input', () => {
+    renderChatContext();
+    updateApprovalHint();
+  });
   $('#department').addEventListener('change', () => {
     store.set('sg.department', department());
     state.budgetSig = '';
