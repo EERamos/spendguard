@@ -5,15 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>SpendGuard</title>
     <meta name="description" content="Políticas de gasto para agentes de IA sobre Reap Agentic Payments" />
+    <meta name="theme-color" content="#141c1c" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23141c1c'/%3E%3Ctext x='16' y='21' text-anchor='middle' font-family='monospace' font-weight='700' font-size='13' fill='%2371f7ec'%3ESG%3C/text%3E%3C/svg%3E" />
+    <!-- Geist / Geist Mono (Reap's label face). Offline, the stacks fall back to system fonts. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600;700&display=swap" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <header class="topbar">
+    <header class="appbar">
+      <div class="topbar">
       <div class="brand">
         <div class="logo" aria-hidden="true">SG</div>
         <div>
           <h1>SpendGuard</h1>
-          <p>Políticas de gasto para agentes de IA · sobre Reap Agentic Payments</p>
+          <p>Políticas de gasto para agentes de IA · sobre <b>Reap</b><span class="wide-only"> Agentic Payments</span></p>
         </div>
       </div>
       <div class="chips" id="mode-chips" aria-live="polite"></div>
@@ -27,6 +34,7 @@
           <span>Departamento</span>
           <select id="department"></select>
         </label>
+      </div>
       </div>
     </header>
 
@@ -58,9 +66,7 @@
             <table class="requests">
               <thead>
                 <tr>
-                  <th>Hora</th>
                   <th>Producto</th>
-                  <th>Depto.</th>
                   <th>Solicitante</th>
                   <th class="r">Total</th>
                   <th>Estado</th>
@@ -88,7 +94,7 @@
             </div>
           </div>
           <div class="card-body">
-            <p class="muted small" style="margin-top: 0">
+            <p class="muted small lede">
               Reglas que aplica el motor antes de que exista cualquier link de pago de Reap: presupuesto mensual, límite de autoaprobación,
               tope por compra, aprobadores, merchants y palabras bloqueadas. Cada cambio sube la versión y queda en la auditoría.
             </p>

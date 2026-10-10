@@ -161,8 +161,8 @@ function renderChips() {
   const h = state.health;
   if (!h) return;
   const reap = h.reapMode === 'live' ? `<span class="chip live"><span class="dot"></span>Reap sandbox (live)${h.checkoutMode === 'simulated' ? ' · pago simulado' : ''}</span>` : '<span class="chip mock"><span class="dot"></span>Reap simulado (mock)</span>';
-  const agent = `<span class="chip"><span class="dot" style="background:${h.agentMode === 'none' ? 'var(--idle)' : 'var(--accent)'}"></span>Agente: ${h.agentMode === 'none' ? 'no conectado' : esc(h.agentMode)}</span>`;
-  $('#mode-chips').innerHTML = reap + agent + `<span class="chip">Política v${esc(h.policyVersion)}</span>`;
+  const agent = `<span class="chip"><span class="dot ${h.agentMode === 'none' ? '' : 'on'}"></span>Agente: ${h.agentMode === 'none' ? 'no conectado' : esc(h.agentMode)}</span>`;
+  $('#mode-chips').innerHTML = reap + agent + `<span class="chip policy">Política v${esc(h.policyVersion)}</span>`;
   $('#agent-chip').textContent = h.agentMode === 'none' ? 'No conectado' : h.agentMode;
   if (state.renderedAgentMode !== h.agentMode) {
     state.renderedAgentMode = h.agentMode;
@@ -208,9 +208,10 @@ function renderBudgets() {
       const cPct = Math.min(100, (b.committed / total) * 100);
       const rPct = Math.min(100 - cPct, (b.reserved / total) * 100);
       const low = b.remaining < b.monthlyBudget * 0.15;
-      return `<article class="card budget ${b.departmentId === department() ? 'mine' : ''}">
-        <div class="budget-top"><h3>${esc(b.name)}</h3><span class="muted small">${esc(b.month)}</span></div>
-        <div class="budget-remaining num" style="${low ? 'color:var(--bad)' : ''}">${fmtNum(b.remaining)} <small>${esc(b.currency)} disponibles</small></div>
+      const mine = b.departmentId === department();
+      return `<article class="budget ${mine ? 'mine' : ''}">
+        <div class="budget-top"><h3>${esc(b.name)}</h3>${mine ? '<span class="tag">Tu depto.</span>' : ''}<span class="month">${esc(b.month)}</span></div>
+        <div class="budget-remaining num ${low ? 'low' : ''}">${fmtNum(b.remaining)} <small>${esc(b.currency)} disponibles</small></div>
         <div class="bar" role="img" aria-label="Gastado ${fmtNum(b.committed)}, reservado ${fmtNum(b.reserved)} de ${fmtNum(b.monthlyBudget)}">
           <span class="committed" style="width:${cPct}%"></span><span class="reserved" style="width:${rPct}%"></span>
         </div>
@@ -231,10 +232,12 @@ function renderFilters() {
   const counts = Object.fromEntries(
     FILTERS.map(([key, , statuses]) => [key, statuses ? state.requests.filter((r) => statuses.includes(r.status)).length : state.requests.length]),
   );
+  const focused = document.activeElement?.closest?.('#filters [data-filter]')?.dataset.filter;
   $('#filters').innerHTML = FILTERS.map(
     ([key, label]) =>
       `<button class="filter ${state.filter === key ? 'active' : ''}" data-filter="${key}" role="tab" aria-selected="${state.filter === key}">${label}<span class="count">${counts[key]}</span></button>`,
   ).join('');
+  if (focused) $('#filters').querySelector(`[data-filter="${focused}"]`)?.focus();
 }
 
 function renderRequests() {
@@ -245,19 +248,24 @@ function renderRequests() {
   const statuses = FILTERS.find(([k]) => k === state.filter)?.[2];
   const rows = statuses ? state.requests.filter((r) => statuses.includes(r.status)) : state.requests;
   $('#requests-empty').hidden = rows.length > 0;
+  $('#requests-empty').innerHTML =
+    state.requests.length > 0
+      ? 'No hay solicitudes en este filtro.'
+      : 'Aún no hay solicitudes. Pídele algo al agente o ejecuta <span class="mono">npm run seed</span>.';
   const depts = state.policy?.departments ?? {};
+  // Rows are rebuilt below: remember the keyboard focus so it survives the re-render.
+  const focusedId = document.activeElement?.closest?.('#requests-body tr[data-id]')?.dataset.id;
   $('#requests-body').innerHTML = rows
     .map(
-      (r) => `<tr data-id="${esc(r.id)}" class="${r.id === state.selectedId ? 'selected' : ''}">
-        <td class="num muted">${fmtTime(r.createdAt)}</td>
-        <td><div class="product">${esc(r.item.productName)}${r.item.quantity > 1 ? ` <span class="muted">×${r.item.quantity}</span>` : ''}</div><div class="muted small">${esc(r.item.merchant)}</div></td>
-        <td>${esc(depts[r.departmentId]?.name ?? r.departmentId)}</td>
-        <td class="small">${esc(r.requester.email)}</td>
+      (r) => `<tr data-id="${esc(r.id)}" class="${r.id === state.selectedId ? 'selected' : ''}" tabindex="0"${r.id === state.selectedId ? ' aria-current="true"' : ''}>
+        <td><div class="product">${esc(r.item.productName)}${r.item.quantity > 1 ? ` <span class="muted">×${r.item.quantity}</span>` : ''}</div><div class="sub">${esc(r.item.merchant)} · <span class="num">${fmtTime(r.createdAt)}</span></div></td>
+        <td class="who"><div>${esc(depts[r.departmentId]?.name ?? r.departmentId)}</div><div class="sub">${esc(r.requester.email)}</div></td>
         <td class="r num">${fmtMoney(r.checkout?.finalAmount ?? r.quote.total)}</td>
-        <td>${badge(r.status)}${r.reconciliation?.flagged ? ' <span class="badge s-PENDING_APPROVAL" title="El cargo final difiere de la cotización">Variación</span>' : ''}</td>
+        <td><div class="status">${badge(r.status)}${r.reconciliation?.flagged ? '<span class="badge variance" title="El cargo final difiere de la cotización">Variación</span>' : ''}</div></td>
       </tr>`,
     )
     .join('');
+  if (focusedId) $('#requests-body').querySelector(`tr[data-id="${CSS.escape(focusedId)}"]`)?.focus();
 }
 
 // ---------------------------------------------------------------- detail
@@ -292,7 +300,7 @@ function quoteTable(q) {
   const ship = (q.shippingOptions ?? []).find((o) => o.selected);
   return `<table class="kv">${rows.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${fmtMoney(v)}</td></tr>`).join('')}
     <tr class="total"><td>Total cotizado</td><td>${fmtMoney(b.finalAmount)}</td></tr></table>
-    <div class="muted small" style="margin-top:6px">Cotización <span class="mono">${esc(q.id)}</span> (intento ${esc(q.attempt)})${ship ? ` · ${esc(ship.name)}` : ''} · expira ${fmtTime(q.expiresAt)}</div>`;
+    <div class="muted small note-line">Cotización <span class="mono">${esc(q.id)}</span> (intento ${esc(q.attempt)})${ship ? ` · ${esc(ship.name)}` : ''} · expira ${fmtTime(q.expiresAt)}</div>`;
 }
 
 function approvalHint(r) {
@@ -316,7 +324,7 @@ function actionsSection(r) {
   if (r.status === 'PENDING_APPROVAL') {
     return `<div class="section"><h3>Aprobación interna</h3>
       <div class="callout warn" id="approval-hint">${approvalHint(r)}</div>
-      <div class="stack" style="margin-top:10px">
+      <div class="stack">
         <textarea class="note" id="action-note" placeholder="Nota para aprobar o motivo del rechazo"></textarea>
         <div class="btn-row">
           <button class="btn ok" data-action="approve">Aprobar</button>
@@ -330,7 +338,7 @@ function actionsSection(r) {
     return `<div class="section"><h3>Pago en Reap</h3>
       <div class="callout info">Checkout <span class="mono">${esc(r.checkout?.id)}</span> en estado <strong>${esc(r.checkout?.status)}</strong>.
       El titular de la tarjeta revisa y autoriza el cargo en la página de Reap; ni SpendGuard ni el agente ven datos de tarjeta.</div>
-      <div class="stack" style="margin-top:10px">
+      <div class="stack">
         ${url ? `<a class="btn primary big" href="${esc(url)}">Abrir página de pago de Reap</a>` : ''}
         <div class="btn-row"><button class="btn" data-action="refresh">Consultar estado en Reap</button></div>
         ${r.checkout?.paymentUrlExpiresAt ? `<div class="muted small">El link expira ${fmtDateTime(r.checkout.paymentUrlExpiresAt)}</div>` : ''}
@@ -431,7 +439,7 @@ function renderDetail(force = false) {
   $('#detail').innerHTML = `
     <div class="card-head">${badge(r.status)}<span class="mono muted">${esc(r.id)}</span>
       <button class="btn ghost spacer" data-action="close" title="Cerrar">Cerrar</button></div>
-    <div class="card-body" style="padding-bottom:12px">
+    <div class="card-body tight">
       <div class="detail-title">${esc(r.item.productName)}${r.item.quantity > 1 ? ` <span class="muted">×${r.item.quantity}</span>` : ''}</div>
       <div class="muted">${esc(r.item.merchant)} · ${fmtMoney(r.item.unitPrice)} c/u</div>
       <dl class="meta">
@@ -442,9 +450,9 @@ function renderDetail(force = false) {
         ${r.declaredMaxTotal !== undefined ? `<dt>Máximo declarado</dt><dd>${fmtNum(r.declaredMaxTotal)}</dd>` : ''}
       </dl>
     </div>
-    <div class="section"><h3>Decisión de la política ${outcomeBadge(r.decision.outcome)}<span class="muted" style="text-transform:none;letter-spacing:0">v${esc(r.decision.policyVersion)}</span></h3>
+    <div class="section"><h3>Decisión de la política ${outcomeBadge(r.decision.outcome)}<span class="version">v${esc(r.decision.policyVersion)}</span></h3>
       ${hitList(r.decision.hits)}
-      ${budget ? `<div class="muted small" style="margin-top:8px">Presupuesto ${esc(dept?.name ?? r.departmentId)}: disponible ${fmtNum(budget.remainingBefore)} → ${fmtNum(budget.remainingAfter)} ${esc(budget.currency)} tras esta compra</div>` : ''}
+      ${budget ? `<div class="muted small note-line">Presupuesto ${esc(dept?.name ?? r.departmentId)}: disponible ${fmtNum(budget.remainingBefore)} → ${fmtNum(budget.remainingAfter)} ${esc(budget.currency)} tras esta compra</div>` : ''}
     </div>
     <div class="section"><h3>Cotización de Reap</h3>${quoteTable(r.quote)}</div>
     ${actionsSection(r)}
@@ -646,7 +654,7 @@ function renderAudit() {
           .map((e) => {
             const [label] = EVENT[e.type] ?? [e.type];
             const summary = eventSummary(e);
-            return `<div class="audit-row"><div class="muted num small">${fmtTime(e.at)}</div>
+            return `<div class="audit-row"><div class="time num">${fmtTime(e.at)}</div>
               <div><strong>${esc(label)}</strong> <span class="muted small">· ${esc(e.actor)}</span>
               ${e.requestId ? ` <a class="mono" href="#/requests/${esc(e.requestId)}">${esc(e.requestId)}</a>` : ''}
               ${summary ? `<div class="small muted">${esc(summary)}</div>` : ''}</div></div>`;
@@ -724,6 +732,13 @@ function wire() {
   $('#requests-body').addEventListener('click', (e) => {
     const row = e.target.closest('tr[data-id]');
     if (row) select(row.dataset.id);
+  });
+  $('#requests-body').addEventListener('keydown', (e) => {
+    const row = e.target.closest('tr[data-id]');
+    if (row && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault();
+      select(row.dataset.id);
+    }
   });
   $('#detail').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-action]');
