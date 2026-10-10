@@ -6,7 +6,7 @@ import { createAgent } from './agent';
 import type { Agent } from './agent/types';
 import { loadConfig } from './config';
 import type { AppConfig } from './config';
-import { PolicyProvider } from './domain/policy';
+import { loadPolicyFile, PolicyProvider } from './domain/policy';
 import type { Policy } from './domain/policy';
 import type { RequestStatus } from './domain/types';
 import { createReapClient, MockReapClient } from './reap';
@@ -148,7 +148,10 @@ export async function buildApp(overrides: AppOverrides = {}): Promise<BuiltApp> 
       ? overrides.policy
       : overrides.policy
         ? new PolicyProvider(null, overrides.policy)
-        : new PolicyProvider(config.policyFile);
+        : // In-memory mode (dataFile null) never writes to disk: load the policy file but do not persist edits.
+          config.dataFile === null
+          ? new PolicyProvider(null, loadPolicyFile(config.policyFile))
+          : new PolicyProvider(config.policyFile);
 
   const store = overrides.store ?? new JsonStore(config.dataFile);
   const reap =

@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SpendGuard</title>
+    <meta name="description" content="Políticas de gasto para agentes de IA sobre Reap Agentic Payments" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">SG</div>
+        <div>
+          <h1>SpendGuard</h1>
+          <p>Políticas de gasto para agentes de IA · sobre Reap Agentic Payments</p>
+        </div>
+      </div>
+      <div class="chips" id="mode-chips" aria-live="polite"></div>
+      <div class="session">
+        <label class="field">
+          <span>Actuando como</span>
+          <input id="actor" type="email" list="known-users" autocomplete="off" spellcheck="false" />
+          <datalist id="known-users"></datalist>
+        </label>
+        <label class="field">
+          <span>Departamento</span>
+          <select id="department"></select>
+        </label>
+      </div>
+    </header>
+
+    <main class="page">
+      <section class="budgets" id="budgets" aria-label="Presupuestos por departamento"></section>
+
+      <div class="workspace">
+        <section class="card panel-chat" aria-label="Agente de compras">
+          <div class="card-head">
+            <h2>Agente de compras</h2>
+            <span class="chip" id="agent-chip">…</span>
+            <button class="btn ghost spacer" id="chat-reset" type="button" title="Empezar una conversación nueva">Nueva</button>
+          </div>
+          <div class="chat-log" id="chat-log" aria-live="polite"></div>
+          <div class="suggestions" id="suggestions"></div>
+          <div class="chat-context" id="chat-context"></div>
+          <form class="composer" id="chat-form">
+            <textarea id="chat-input" rows="1" placeholder="Ej. compra 2 power banks de menos de 100 dólares" aria-label="Mensaje para el agente"></textarea>
+            <button class="btn primary" id="chat-send" type="submit">Enviar</button>
+          </form>
+        </section>
+
+        <section class="card panel-requests" aria-label="Solicitudes de compra">
+          <div class="card-head">
+            <h2>Solicitudes</h2>
+            <div class="filters spacer" id="filters" role="tablist"></div>
+          </div>
+          <div class="table-wrap">
+            <table class="requests">
+              <thead>
+                <tr>
+                  <th>Hora</th>
+                  <th>Producto</th>
+                  <th>Depto.</th>
+                  <th>Solicitante</th>
+                  <th class="r">Total</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody id="requests-body"></tbody>
+            </table>
+          </div>
+          <div class="empty" id="requests-empty" hidden>
+            Aún no hay solicitudes. Pídele algo al agente o ejecuta <span class="mono">npm run seed</span>.
+          </div>
+        </section>
+
+        <section class="card panel-detail" id="detail" aria-label="Detalle de la solicitud"></section>
+      </div>
+
+      <div class="lower">
+        <section class="card" aria-label="Política de gasto">
+          <div class="card-head">
+            <h2>Política</h2>
+            <span class="chip" id="policy-version">v–</span>
+            <div class="btn-row spacer">
+              <button class="btn" id="policy-reload" type="button">Recargar</button>
+              <button class="btn primary" id="policy-save" type="button">Guardar política</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <p class="muted small" style="margin-top: 0">
+              Reglas que aplica el motor antes de que exista cualquier link de pago de Reap: presupuesto mensual, límite de autoaprobación,
+              tope por compra, aprobadores, merchants y palabras bloqueadas. Cada cambio sube la versión y queda en la auditoría.
+            </p>
+            <textarea id="policy-text" spellcheck="false" aria-label="Política en JSON"></textarea>
+            <div class="policy-status" id="policy-status"></div>
+          </div>
+        </section>
+
+        <section class="card" aria-label="Auditoría">
+          <div class="card-head">
+            <h2>Auditoría</h2>
+            <span class="muted small spacer">Últimos eventos</span>
+          </div>
+          <div class="audit-list" id="audit-list"></div>
+        </section>
+      </div>
+    </main>
+
+    <div class="toasts" id="toasts" aria-live="assertive"></div>
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

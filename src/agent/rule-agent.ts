@@ -44,7 +44,8 @@ const NUMBER_WORDS: Record<string, number> = {
 
 const PRICE_PATTERNS: RegExp[] = [
   /(?:por menos de|menos de|por debajo de|debajo de|no mas de|maximo de|maximo|max\.?|hasta|under|less than|below|up to|at most|<=?)\s*(?:us)?\$?\s*(\d+(?:[.,]\d{1,2})?)\s*(usd|dolares|dolar|dlls|dls|mxn|pesos|mx)?/,
-  /(?:us)?\$\s*(\d+(?:[.,]\d{1,2})?)\s*(usd|mxn)?\s*(?:max|maximo|como maximo|o menos|tope)/,
+  /(?:us)?\$\s*(\d+(?:[.,]\d{1,2})?)\s*(usd|mxn)?\s*(?:max|maximo|como maximo|o menos|tope|en total|in total|total)/,
+  /\b(\d+(?:[.,]\d{1,2})?)\s*(usd|dolares|dolar|dlls|dls|mxn|pesos)\s*(?:max|maximo|como maximo|o menos|tope|en total|in total|total)/,
 ];
 
 const UNIT_WORDS = 'mah|w|gb|tb|in|pulgadas|ft|oz|mm|cm|m|kg|g|ml|l|usd|dolares|pesos|mxn|%';
@@ -73,6 +74,7 @@ export function parsePurchaseMessage(message: string, fx: { mxnToBase?: number }
   let text = normalize(message);
 
   let limit: number | undefined;
+  let isTotal = false;
   for (const re of PRICE_PATTERNS) {
     const m = re.exec(text);
     if (!m) continue;
@@ -80,10 +82,11 @@ export function parsePurchaseMessage(message: string, fx: { mxnToBase?: number }
     const currency = m[2] ?? '';
     if (/mxn|pesos|mx/.test(currency) && fx.mxnToBase) amount = Math.round(amount * fx.mxnToBase * 100) / 100;
     limit = amount;
+    isTotal = /\btotal\b/.test(m[0]);
     text = `${text.slice(0, m.index)} ${text.slice(m.index + m[0].length)}`;
     break;
   }
-  const isTotal = /\b(en total|total|in total)\b/.test(text);
+  isTotal ||= /\b(en total|total|in total)\b/.test(text);
   text = text.replace(/\b(en total|in total|total)\b/g, ' ');
 
   let quantity = 1;
@@ -135,9 +138,12 @@ export function parsePurchaseMessage(message: string, fx: { mxnToBase?: number }
   };
 }
 
+/** Rough ES/EN singular so "monitores", "switches" and "power banks" match catalog wording. */
 function singular(word: string): string {
-  if (word.length > 5 && word.endsWith('es')) return word.slice(0, -2);
-  if (word.length > 3 && word.endsWith('s') && !word.endsWith('ss')) return word.slice(0, -1);
+  if (word.length <= 3 || word.endsWith('ss')) return word;
+  if (/(ches|shes|xes|zes|sses)$/.test(word)) return word.slice(0, -2);
+  if (word.length > 5 && /(ores|ares|ales|eles|iles|ures)$/.test(word)) return word.slice(0, -2);
+  if (word.endsWith('s')) return word.slice(0, -1);
   return word;
 }
 
