@@ -96,7 +96,12 @@ export function evaluate(input: EvaluationInput, policy: Policy, spend: SpendSna
   let budget: BudgetSnapshot | null = null;
 
   if (totalBase === null) {
-    add('CURRENCY_UNSUPPORTED', 'REQUIRE_APPROVAL', `Sin tipo de cambio para ${input.total.currency}: requiere revisión humana`);
+    // Without a rate the budget and the hard cap cannot be enforced, so fail closed.
+    add(
+      'CURRENCY_UNSUPPORTED',
+      'DENY',
+      `Sin tipo de cambio configurado para ${input.total.currency}: no se puede validar presupuesto ni tope (agrega la tasa en "fx")`,
+    );
   } else {
     if (totalBase > dept.hardCapPerPurchase) {
       add(

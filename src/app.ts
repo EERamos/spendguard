@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import Fastify from 'fastify';
+import Fastify, { LogController } from 'fastify';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z, ZodError } from 'zod';
 import { createAgent } from './agent';
@@ -169,7 +169,7 @@ export async function buildApp(overrides: AppOverrides = {}): Promise<BuiltApp> 
   const agent =
     typeof overrides.agent === 'function' ? overrides.agent(service) : (overrides.agent ?? createAgent(config, service));
 
-  const app = Fastify({ logger: config.logger, disableRequestLogging: true });
+  const app = Fastify({ logger: config.logger, logController: new LogController({ disableRequestLogging: true }) });
 
   // The dashboard polls every few seconds: log only writes and failures.
   app.addHook('onResponse', async (req, reply) => {

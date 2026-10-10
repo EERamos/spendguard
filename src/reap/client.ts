@@ -89,7 +89,8 @@ export class LiveReapClient implements ReapClient {
       const retryable = res.status === 429 || (serverError && mode !== 'fail');
       if (retryable && attempt < this.maxRetries) {
         const retryAfter = Number(res.headers.get('retry-after'));
-        await this.sleep(Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : backoff(attempt));
+        // Cap Retry-After so a misbehaving header cannot stall a request indefinitely.
+        await this.sleep(Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter, 30) * 1000 : backoff(attempt));
         if (serverError && mode === 'retry-new-key' && o.idempotencyKey) key = `${o.idempotencyKey}:r${attempt + 1}`;
         continue;
       }

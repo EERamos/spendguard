@@ -166,10 +166,10 @@ describe('evaluate()', () => {
     expect(rules(big)).toContain('APPROVAL_THRESHOLD');
   });
 
-  it('sends currencies without an FX rate to a human (CURRENCY_UNSUPPORTED)', () => {
+  it('fails closed on currencies without an FX rate (CURRENCY_UNSUPPORTED)', () => {
     expect(toBase({ amount: 10, currency: 'EUR' }, policy)).toBeNull();
     const d = evaluate(input({ total: { amount: 10, currency: 'EUR' } }), policy, NO_SPEND);
-    expect(d.outcome).toBe('REQUIRE_APPROVAL');
+    expect(d.outcome).toBe('DENY');
     expect(rules(d)).toEqual(['CURRENCY_UNSUPPORTED']);
     expect(d.budget).toBeNull();
   });
